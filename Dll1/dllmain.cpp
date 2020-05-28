@@ -1,17 +1,12 @@
 ﻿// dllmain.cpp : Определяет точку входа для приложения DLL.
 #include "pch.h"
-
 #include <windows.h>
 #include <stdio.h>
-int WINAPI DllMain(HINSTANCE hlnstance, DWORD fdReason, PVOID pvReserved)
-{
-    return TRUE;
-}
-//экспортировать Фильтрующую функцию
-extern "C" __declspec(dllexport) 
+
+extern "C" __declspec(dllexport)
 LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-    if (nCode < 0)//если nCode, не продолжать обработку
+    if (nCode < 0) //если nCode, не продолжать обработку
         return CallNextHookEx(NULL, nCode, wParam, lParam);
     if (lParam & 0x80000000) //если нажата клавиша
     {
@@ -24,8 +19,13 @@ LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam)
         else
             //иначе, вывести параметр wParam как число
             sprintf_s(slnfo, 50, "nCode = %d, wParam: %d, lParam: %d\0", nCode, wParam, lParam);
-                //вывести собщение на экран
+        //вывести собщение на экран
         MessageBoxA(NULL, LPCSTR(slnfo), "Keyboard hook info", MB_OK);
     }
     return TRUE; //заблокировать дальнейшую обработку
+}
+
+int WINAPI DllMain(HINSTANCE hlnstance, DWORD fdReason, PVOID pvReserved)
+{
+    return TRUE;
 }

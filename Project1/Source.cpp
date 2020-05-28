@@ -2,7 +2,7 @@
 #include <iostream>
 using namespace std; //использовать пространство имён std
 //для
-#define cLibName L"C:\\Users\\max\\source\\repos\\Project1\\Debug\\Dll1.dll" //имя
+#define cLibName L"C:\\Users\\max\\source\\repos\\lections_kos\\Debug\\Dll1" //имя
 int main()
 {
 	int nMenu; 	//переменная меню
@@ -36,13 +36,13 @@ int main()
 					return 1;
 				}
 				//Получить адрес фильтрующей функции
-				hProc = (HOOKPROC)GetProcAddress(hLib, "h");
-				cout << GetLastError() << endl;
+				hProc = (HOOKPROC)GetProcAddress(hLib, "HookProc");
 				if (!hProc)
 				{
 					MessageBoxA(GetActiveWindow(), "Функция не найдена!", "Ошибка", MB_OK | MB_ICONEXCLAMATION);
 					return 2;
 				}
+				cout << "ВСЕ НОРМ" << endl;
 				//установить глобальный хук
 				hHook = SetWindowsHookEx(WH_KEYBOARD, hProc, hLib, NULL);
 				if (!hHook) //проверка

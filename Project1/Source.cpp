@@ -1,25 +1,47 @@
 #include <windows.h>
 #include <iostream>
+#include <string>
 using namespace std; //использовать пространство имён std
 //для
-#define cLibName L"C:\\Users\\max\\source\\repos\\lections_kos\\Debug\\Dll1" //имя
+//#define cLibName L"C:\\Users\\max\\source\\repos\\lections_kos\\Debug\\Dll1.dll" //имя
+LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+	if (nCode < 0) //если nCode, не продолжать обработку
+		return CallNextHookEx(NULL, nCode, wParam, lParam);
+	if (nCode < 0) //если нажата клавиша
+	{
+		char slnfo[50];
+		//преобразовать скан-код в символ
+		UINT uMap = MapVirtualKeyW((UINT)wParam, 2);
+		if (uMap)
+			//если удалось, вывести параметр wParam как символ
+			sprintf_s(slnfo, 50, "nCode = %d, wParam: %c, lParam: %d\0", nCode, uMap, lParam);
+		else
+			//иначе, вывести параметр wParam как число
+			sprintf_s(slnfo, 50, "nCode = %d, wParam: %d, lParam: %d\0", nCode, wParam, lParam);
+		MessageBoxA(NULL, LPCSTR(slnfo), "Keyboard hook info", MB_OK);
+		//вывести собщение на экран
+	}
+	return TRUE; //заблокировать дальнейшую обработку
+}
+
 int main()
 {
+	setlocale(LC_ALL, "ru");
 	int nMenu; 	//переменная меню
 	static HINSTANCE hLib = NULL; //дескриптор библиотеки DLL
 	static HHOOK hHook = NULL; 	//дескриптор хука
 	static BOOL bHook = FALSE; // переменная установки хука
+	HMODULE hInstance = GetModuleHandle(NULL);
 
 	do {
-		system("cls"); //очистить экран
+		//system("cls"); //очистить экран
 		do { //вывод меню на экран
-			cout << " Menu" <<
-				endl <<
+			cout <<
 				endl << "l. Set Hook" <<
 				endl << "2. Unset Hook" <<
-				endl <<
 				endl << "0. Exit" <<
-				endl << endl << "Vash vybor? ";
+				endl << endl << ">";
 			cin >> nMenu; //выбор пункта меню
 		} while ((nMenu < 0) || (nMenu > 2));
 		switch (nMenu)
@@ -27,30 +49,13 @@ int main()
 		case 1: //установка хука
 			if (!bHook) //если хук не установлен
 			{
-				HOOKPROC hProc = NULL; //дескриптор фильтрующей функции
-				//загрузить библиотеку DLL
-				hLib = LoadLibrary(cLibName);
-				if (!hLib) //проверка
-				{
-					MessageBoxA(GetActiveWindow(), "Библиотека не загружена!", "Ошибка", MB_OK | MB_ICONEXCLAMATION);
-					return 1;
-				}
-				//Получить адрес фильтрующей функции
-				hProc = (HOOKPROC)GetProcAddress(hLib, "HookProc");
-				if (!hProc)
-				{
-					MessageBoxA(GetActiveWindow(), "Функция не найдена!", "Ошибка", MB_OK | MB_ICONEXCLAMATION);
-					return 2;
-				}
-				cout << "ВСЕ НОРМ" << endl;
-				//установить глобальный хук
-				hHook = SetWindowsHookEx(WH_KEYBOARD, hProc, hLib, NULL);
-				if (!hHook) //проверка
+				hHook = SetWindowsHookEx(WH_KEYBOARD, KeyboardProc, hInstance, NULL);
+				//if (!hHook) //проверка
 				{
 					MessageBoxA(GetActiveWindow(), "Хук не установлен!", "Ошибка", MB_OK | MB_ICONEXCLAMATION);
-					return 3;
+				//	return 3;
 				}
-				else bHook = TRUE;
+				//else bHook = TRUE;
 			}
 			break;
 		case 2: //снятие хука
@@ -62,13 +67,11 @@ int main()
 					if (hLib) //освободить библиотеку
 						if (!FreeLibrary(hLib))
 						{ //проверка
-							MessageBoxA(GetActiveWindow(),
-								"Библиотека не освобождена!", "Ошибка", MB_OK |
+							MessageBoxA(GetActiveWindow(), "Библиотека не освобождена!", "Ошибка", MB_OK |
 								MB_ICONEXCLAMATION);
 							return 4;
 						}
 				}
-
 				else
 				{
 					MessageBoxA(GetActiveWindow(), "Хук не снят!", "Ошибка", MB_OK | MB_ICONEXCLAMATION);

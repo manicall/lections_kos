@@ -14,9 +14,7 @@ int WINAPI    WinMain(HINSTANCE   hInstance,
 	LPSTR       lpCmdLine,
 	int         nCmdShow)
 {
-
 	MSG     msg;
-
 	ghInstance = hInstance;
 	// Создание  диалогового окна
 	hWndDialog = CreateDialogParam(hInstance,
@@ -52,8 +50,45 @@ BOOL CALLBACK   PviewDlgProc(HWND    hWnd,
 	{
 		// сообщение об инициализации диалоговой формы
 	case WM_INITDIALOG:
+	{
+		DWORD dwCurentRecord = 0;
+		DWORD NumberOfRecords = 0;
+		LPVOID lpBuffer;
+		DWORD dwRead = 0;
+		DWORD dwNeed = 0;
+		DWORD dwSize = sizeof(EVENTLOGRECORD);
+		DWORD dwPos = 0;
+		system("chcp 1251");
+		HANDLE hEventLog = OpenBackupEventLog(NULL, L"C:\\Windows\\System32\\winevt\\Logs\\Application.evtx");
+		if (!hEventLog)
+			MessageBox(0, L"OpenEventLog", NULL, MB_OK | MB_ICONERROR);
+		else if (!GetNumberOfEventLogRecords(hEventLog, &NumberOfRecords))
+			MessageBox(0, L"GetNumberOfEventLogRecords", NULL, MB_OK | MB_ICONERROR);
+		else
+		{
+			//Память под массив структур
+			lpBuffer = new LPVOID[NumberOfRecords * dwSize * 8];
+			if
+				(
+					!ReadEventLog
+					(
+						hEventLog,
+						NULL,
+						0,
+						lpBuffer,
+						NumberOfRecords * dwSize,
+						&dwRead,
+						&dwNeed
+					)
+					)
+			{
+				MessageBox(0, L"ReadEventLog", NULL, MB_OK | MB_ICONERROR);
+				PostQuitMessage(0);;
+			}
 
-		break;
+		}
+	}			
+	break;
 	case WM_CLOSE:
 		PostQuitMessage(0);
 		break;

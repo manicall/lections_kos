@@ -1,14 +1,91 @@
-﻿#include "framework.h"
-#include <windows.h>
-#include <stdlib.h>
-#include <stdio.h>
+﻿#pragma warning(disable : 4996)
+#include "framework.h"
+#include <windowsx.h>
 #include "resource.h"
+#include <string>
+#include <chrono>
 
+using namespace std;
 HWND hWndDialog;
-HINSTANCE       ghInstance;   // Переменная для хранения хендела процесса                      
-// Описание используемой оконной процедуры
+HINSTANCE       ghInstance;
+wstring pEventTypeNames[] = { L"Error", L"Warning", L"Informational", L"Audit Success", L"Audit Failure" };
+int wmId, wmEvent;
+HWND cb, lb;
+
+class UserTimer {
+	std::chrono::time_point<std::chrono::steady_clock> start, end;
+public:
+	UserTimer() {
+		start = std::chrono::high_resolution_clock::now();
+	}
+	~UserTimer() {
+		end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<float> duration = end - start;
+		ListBox_AddString(lb, (L"Duration: " + to_wstring(duration.count()) + L" s").data());
+	}
+};
+
+void output_records(const wstring& path);
+
+DWORD GetEventTypeName(DWORD EventType)
+{
+	DWORD index = 0;
+
+	switch (EventType)
+	{
+	case EVENTLOG_ERROR_TYPE:
+		index = 0;
+		break;
+	case EVENTLOG_WARNING_TYPE:
+		index = 1;
+		break;
+	case EVENTLOG_INFORMATION_TYPE:
+		index = 2;
+		break;
+	case EVENTLOG_AUDIT_SUCCESS:
+		index = 3;
+		break;
+	case EVENTLOG_AUDIT_FAILURE:
+		index = 4;
+		break;
+	}
+
+	return index;
+}
+
+void print_one_record(BYTE* rec) {
+
+	EVENTLOGRECORD* pRecord = (EVENTLOGRECORD*)rec;
+	std::wstring source_name((wchar_t*)(rec + sizeof(EVENTLOGRECORD)));
+	int count = 0;
+	ListBox_AddString(lb, (L"EventType: " + pEventTypeNames[GetEventTypeName(pRecord->EventType)]).data());
+	ListBox_AddString(lb, (L"Provider: " + source_name).data());
+	ListBox_AddString(lb, (L"Length: " + to_wstring(pRecord->Length)).data());
+	ListBox_AddString(lb, (L"RecordNumber: " + to_wstring(pRecord->RecordNumber)).data());
+	ListBox_AddString(lb, (L"--Strings-- [ " + to_wstring(pRecord->Length) + L" ]").data());
+	
+
+	for (wstring wstr = (wchar_t*)(rec + pRecord->StringOffset); count < pRecord->NumStrings; ++count) {
+		ListBox_AddString(lb, (L"  -> " + wstr).data());
+		wstr += wstr.length() + 1;
+	}
+
+	ListBox_AddString(lb, L"");
+}
+
+void print_records(BYTE* rec, DWORD rec_size) {
+	PBYTE pRecord = rec;
+	PBYTE pEndOfRecords = rec + rec_size;
+	while (pRecord < pEndOfRecords)
+	{
+		print_one_record(pRecord);
+		pRecord += ((PEVENTLOGRECORD)pRecord)->Length;
+	}
+}
+                 
+
 BOOL CALLBACK   PviewDlgProc(HWND hWnd, UINT wMsg, WPARAM wParam, LPARAM lParam);
-// Главное приложение программы
+
 int WINAPI    WinMain(HINSTANCE   hInstance,
 	HINSTANCE   hPrevInstance,
 	LPSTR       lpCmdLine,
@@ -16,14 +93,13 @@ int WINAPI    WinMain(HINSTANCE   hInstance,
 {
 	MSG     msg;
 	ghInstance = hInstance;
-	// Создание  диалогового окна
+
 	hWndDialog = CreateDialogParam(hInstance,
 		MAKEINTRESOURCE(IDD_DIALOG1),
 		NULL,
 		(DLGPROC)PviewDlgProc,
 		(LONG)0);
 
-	// Стандартный цикл обработки сообщений приложения
 	ShowWindow(hWndDialog, nCmdShow);
 	UpdateWindow(hWndDialog);
 	while (GetMessage(&msg, NULL, 0, 0))
@@ -37,10 +113,6 @@ int WINAPI    WinMain(HINSTANCE   hInstance,
 	return 0;
 }
 
-RECT rect;
-HDC hdc, hdcm;
-int wmId, wmEvent;
-PAINTSTRUCT ps; // структура для перерисовки окна
 BOOL CALLBACK   PviewDlgProc(HWND    hWnd,
 	UINT    wMsg,
 	WPARAM  wParam,
@@ -48,68 +120,136 @@ BOOL CALLBACK   PviewDlgProc(HWND    hWnd,
 {
 	switch (wMsg)
 	{
-		// сообщение об инициализации диалоговой формы
 	case WM_INITDIALOG:
 	{
-		DWORD dwCurentRecord = 0;
-		DWORD NumberOfRecords = 0;
-		LPVOID lpBuffer;
-		DWORD dwRead = 0;
-		DWORD dwNeed = 0;
-		DWORD dwSize = sizeof(EVENTLOGRECORD);
-		DWORD dwPos = 0;
-		system("chcp 1251");
-		HANDLE hEventLog = OpenBackupEventLog(NULL, L"C:\\Windows\\System32\\winevt\\Logs\\Application.evtx");
-		if (!hEventLog)
-			MessageBox(0, L"OpenEventLog", NULL, MB_OK | MB_ICONERROR);
-		else if (!GetNumberOfEventLogRecords(hEventLog, &NumberOfRecords))
-			MessageBox(0, L"GetNumberOfEventLogRecords", NULL, MB_OK | MB_ICONERROR);
-		else
-		{
-			//Память под массив структур
-			lpBuffer = new LPVOID[NumberOfRecords * dwSize * 8];
-			if
-				(
-					!ReadEventLog
-					(
-						hEventLog,
-						NULL,
-						0,
-						lpBuffer,
-						NumberOfRecords * dwSize,
-						&dwRead,
-						&dwNeed
-					)
-					)
-			{
-				MessageBox(0, L"ReadEventLog", NULL, MB_OK | MB_ICONERROR);
-				PostQuitMessage(0);;
-			}
+		
+		cb = GetDlgItem(hWnd, IDC_COMBO1);
+		lb = GetDlgItem(hWnd, IDC_LIST1);
 
-		}
+		ComboBox_AddString(cb, L"C:\\Windows\\System32\\winevt\\Logs\\Application.evtx");
+		ComboBox_AddString(cb, L"C:\\Windows\\System32\\winevt\\Logs\\Security.evtx");
+		ComboBox_AddString(cb, L"C:\\Windows\\System32\\winevt\\Logs\\Setup.evtx");
+		ComboBox_AddString(cb, L"C:\\Windows\\System32\\winevt\\Logs\\System.evtx");
+		
 	}			
 	break;
 	case WM_CLOSE:
 		PostQuitMessage(0);
 		break;
-
-
 	case WM_PAINT:
-		hdc = BeginPaint(hWnd, &ps);
-
+	{
+		PAINTSTRUCT ps;
+		HDC hdc = BeginPaint(hWnd, &ps);
 		EndPaint(hWnd, &ps);
 		break;
+	}
 	case WM_COMMAND:
 		switch (LOWORD(wParam))
 		{
-		
+		case IDC_COMBO1:
+			switch (HIWORD(wParam)) {
+			case CBN_SELCHANGE: 
+				ListBox_ResetContent(lb);
+				switch (SendMessage(cb, CB_GETCURSEL, 0, 0))
+				{
+				case 0: 			
+				{
+					output_records(L"C:\\Windows\\System32\\winevt\\Logs\\Application.evtx");
+					break;
+				}
+				case 1:
+				{
+					output_records(L"C:\\Windows\\System32\\winevt\\Logs\\Security.evtx");
+					break;
+				}
+				case 2:
+				{
+					output_records(L"C:\\Windows\\System32\\winevt\\Logs\\Setup.evtx");
+					break;
+				}
+				case 3:
+				{
+					output_records(L"C:\\Windows\\System32\\winevt\\Logs\\System.evtx");
+					break;
+				}		
+				}
+				break;
+			default:
+				break;
+			}
 		default:
-			return FALSE;
+			break;
 		}
-		break;
-
 	default:
 		return FALSE;
 	}
 	return TRUE;
+}
+
+void output_records(const wstring& path) {
+	UserTimer t;
+	const unsigned MAX_BUFF_SIZE = 0x10000;
+
+	DWORD NumberOfRecords = 0;
+	BYTE* pBuffer = new BYTE[MAX_BUFF_SIZE];
+	DWORD dwBytesToRead = MAX_BUFF_SIZE;
+	DWORD status = ERROR_SUCCESS;
+	DWORD dwBytesRead = 0;
+	DWORD dwMinimumBytesToRead = 0;
+
+	HANDLE hEventLog = OpenEventLog(NULL, path.data());
+	ListBox_AddString(lb, path.data());
+	if (!hEventLog)
+	{
+		ListBox_AddString(lb, (L"OpenEventLogA [ " + to_wstring(GetLastError()) + L" ]\n").data());
+	}
+	if (!GetNumberOfEventLogRecords(hEventLog, &NumberOfRecords))
+	{
+		ListBox_AddString(lb, (L"GetNumberOfEventLogRecords [ " + to_wstring(GetLastError()) + L" ]\n").data());
+	}
+
+	ListBox_AddString(lb, (L"NumberOfRecords [ " + to_wstring(NumberOfRecords) + L" ]\n").data());
+	int count = 0;
+	while (ERROR_SUCCESS == status)
+	{
+		if (!ReadEventLog(hEventLog,
+			EVENTLOG_SEQUENTIAL_READ | EVENTLOG_BACKWARDS_READ,
+			0,
+			pBuffer,
+			dwBytesToRead,
+			&dwBytesRead,
+			&dwMinimumBytesToRead))
+		{
+			status = GetLastError();
+			if (ERROR_INSUFFICIENT_BUFFER == status)
+			{
+				status = ERROR_SUCCESS;
+
+				BYTE* pTemp = new BYTE[dwMinimumBytesToRead];
+				delete[] pBuffer;
+
+				pBuffer = pTemp;
+				dwBytesToRead = dwMinimumBytesToRead;
+			}
+			else
+			{
+				if (ERROR_HANDLE_EOF != status)
+				{
+					if (hEventLog)
+						CloseEventLog(hEventLog);
+					delete[] pBuffer;
+					return ;
+					system("pause");
+				}
+			}
+		}
+		else
+		{
+			print_records(pBuffer, dwBytesRead);
+			if (++count > 5) break;
+		}
+	}
+	if (hEventLog)
+		CloseEventLog(hEventLog);
+	delete[] pBuffer;
 }
